@@ -1,0 +1,2 @@
+-- Seed SQL sengaja kosong.
+-- Data demo/dev dibuat lewat scripts/seed-demo.mjs (memakai alur aplikasi sungguhan).
