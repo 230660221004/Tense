@@ -3,11 +3,37 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronsLeft, ChevronsRight, PlusCircle, UserRound, X } from "lucide-react";
-import Image from "next/image";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { UserRole } from "@/lib/domain/types";
 import { cn } from "@/lib/utils/format";
 import { navForRole } from "./nav-config";
+
+/** Lambang Tanse: bintang segi delapan (motif geometris Islam) dengan huruf T. */
+function TanseMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" className={className} aria-hidden>
+      <g fill="#0b2f6b" stroke="#0b2f6b" strokeWidth="3" strokeLinejoin="round">
+        <rect x="11" y="11" width="42" height="42" />
+        <rect x="11" y="11" width="42" height="42" transform="rotate(45 32 32)" />
+      </g>
+      <path fill="#ffffff" d="M20 21H44V27H35V45H29V27H20Z" />
+    </svg>
+  );
+}
+
+function TanseLogo({ collapsed }: { collapsed: boolean }) {
+  return (
+    <>
+      <TanseMark className="size-10 shrink-0" />
+      {!collapsed && (
+        <span className="leading-tight">
+          <span className="block text-[18px] font-semibold tracking-[-0.03em] text-ink">Tanse</span>
+          <span className="block text-[11px] text-ink-2">Sistem Kedisiplinan</span>
+        </span>
+      )}
+    </>
+  );
+}
 
 export interface SidebarProps {
   role: UserRole;
@@ -35,13 +61,7 @@ function setCollapsedStore(v: boolean) {
 function Brand({ collapsed }: { collapsed: boolean }) {
   return (
     <Link href="/dashboard" className="flex h-[var(--header-height)] shrink-0 items-center gap-2.5 border-b border-line px-6">
-      <Image src="/brand/logo-al-azhar.png" alt="Logo Al Azhar" width={44} height={44} className="size-10 shrink-0 object-contain" />
-      {!collapsed && (
-        <span className="leading-tight">
-          <span className="block text-[16px] font-semibold tracking-[-0.02em]">TANSE</span>
-          <span className="block text-[11px] text-ink-2">Sistem Kedisiplinan</span>
-        </span>
-      )}
+      <TanseLogo collapsed={collapsed} />
     </Link>
   );
 }
