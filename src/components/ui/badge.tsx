@@ -48,7 +48,7 @@ export function StatusSuratBadge({ status }: { status: StatusSurat }) {
 }
 
 const remisiTone: Record<StatusRemisiPengajuan, Tone> = {
-  diajukan: "warning", perlu_perbaikan: "info", direkomendasikan: "info", disetujui: "success", ditolak_tanse: "danger", ditolak_kepsek: "danger",
+  diajukan: "warning", perlu_perbaikan: "info", direkomendasikan: "info", disetujui: "success", ditolak_tanse: "danger", ditolak_kepsek: "danger", ditarik: "neutral",
 };
 export function StatusRemisiBadge({ status }: { status: StatusRemisiPengajuan }) {
   return <Badge tone={remisiTone[status]}>{STATUS_REMISI_LABEL[status]}</Badge>;

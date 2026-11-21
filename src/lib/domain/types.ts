@@ -75,6 +75,9 @@ export const STATUS_REMISI_LABEL: Record<StatusRemisiPengajuan, string> = {
   disetujui: "Disetujui",
   ditolak_tanse: "Ditolak Tanse",
   ditolak_kepsek: "Ditolak kepala sekolah",
+  ditarik: "Ditarik oleh pengaju",
+
 };
+
 /** Status yang masih berjalan (satu pengajuan aktif per siswa). */
 export const STATUS_REMISI_AKTIF: StatusRemisiPengajuan[] = ["diajukan", "perlu_perbaikan", "direkomendasikan"];
