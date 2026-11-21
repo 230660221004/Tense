@@ -53,6 +53,43 @@ export async function perbaikiRemisiAction(_: ActionState, fd: FormData): Promis
   return { ok: true, message: "Perbaikan terkirim ke Tanse." };
 }
 
+/** Pengaju mengubah pengajuan yang belum diverifikasi Tanse (surat baru opsional). */
+export async function ubahRemisiAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const profile = await requireRole(PENGAJU_REMISI);
+  // Bentuk isiannya sama dengan perbaikan: id + alasan.
+  const parsed = perbaikiRemisiSchema.safeParse(formObject(fd));
+  if (!parsed.success) return { ok: false, message: "Periksa kembali isian.", errors: zodErrors(parsed.error.issues) };
+  const supabase = await createClient();
+  const { data: aju } = await supabase.from("remisi_pengajuan").select("siswa_id").eq("id", parsed.data.id).maybeSingle();
+  if (!aju) return { ok: false, message: "Pengajuan tidak ditemukan." };
+
+  let dokumenId: string | undefined;
+  const file = fd.get("file");
+  if (file instanceof File && file.size > 0) {
+    const dok = await simpanDokumen(supabase, profile.id, file, { siswa_id: aju.siswa_id, jenis: "surat_remisi", judul: "Surat pengajuan remisi (diubah)" });
+    if (!dok.ok) return { ok: false, message: dok.message, errors: { file: dok.message } };
+    dokumenId = dok.id;
+  }
+  const { error } = await supabase.rpc("ubah_pengajuan_remisi", { p_id: parsed.data.id, p_alasan: parsed.data.alasan, p_dokumen: dokumenId });
+  if (error) return { ok: false, message: pesanError(error, "Perubahan gagal disimpan.") };
+  segarkan(aju.siswa_id);
+  return { ok: true, message: "Pengajuan diperbarui." };
+}
+
+/** Pengaju menarik pengajuan yang belum diputuskan (status menjadi `ditarik`, riwayat tetap ada). */
+export async function tarikRemisiAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  await requireRole(PENGAJU_REMISI);
+  const id = String(fd.get("id") ?? "");
+  if (!id) return { ok: false, message: "Pengajuan tidak valid." };
+  if (fd.get("konfirmasi") !== "ya") return { ok: false, message: "Centang konfirmasi untuk menarik pengajuan.", errors: { konfirmasi: "Wajib dikonfirmasi." } };
+  const supabase = await createClient();
+  const { data: aju } = await supabase.from("remisi_pengajuan").select("siswa_id").eq("id", id).maybeSingle();
+  const { error } = await supabase.rpc("tarik_remisi", { p_id: id });
+  if (error) return { ok: false, message: pesanError(error, "Pengajuan gagal ditarik.") };
+  segarkan(aju?.siswa_id);
+  return { ok: true, message: "Pengajuan ditarik." };
+}
+
 /** Tanse: rekomendasikan ke kepala sekolah, minta perbaikan, atau tolak. */
 export async function verifikasiRemisiAction(_: ActionState, fd: FormData): Promise<ActionState> {
   await requireRole(PENGELOLA);

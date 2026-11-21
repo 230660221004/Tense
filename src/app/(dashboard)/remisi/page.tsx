@@ -10,7 +10,14 @@ import { EmptyState } from "@/components/ui/states";
 import { Disclosure } from "@/components/ui/disclosure";
 import { StatusRemisiBadge } from "@/components/ui/badge";
 import { ActionForm } from "@/components/forms/action-form";
-import { ajukanRemisiAction, perbaikiRemisiAction, putuskanRemisiAction, verifikasiRemisiAction } from "@/lib/actions/remisi";
+import {
+  ajukanRemisiAction,
+  perbaikiRemisiAction,
+  putuskanRemisiAction,
+  verifikasiRemisiAction,
+  tarikRemisiAction,
+  ubahRemisiAction,
+} from "@/lib/actions/remisi";
 import { formatTanggal } from "@/lib/utils/format";
 import { PEMUTUS_REMISI, PENGAJU_REMISI, PENGELOLA } from "@/lib/permissions";
 import { STATUS_REMISI_AKTIF } from "@/lib/domain/types";
@@ -142,26 +149,61 @@ export default async function RemisiPage() {
             <Card><EmptyState icon={HeartHandshake} title="Belum ada pengajuan" description="Pengajuan remisi dan statusnya akan tampil di sini." /></Card>
           ) : (
             <div className="space-y-3">
-              {lainnya.map((p) => (
-                <Card key={p.id} className="p-4">
-                  <KartuPengajuan p={p} />
-                  {pengaju && p.status === "perlu_perbaikan" && p.diajukan_oleh === profile.id && (
-                    <div className="mt-3">
-                      <Disclosure summary="Perbaiki pengajuan" defaultOpen>
-                        <ActionForm
-                          action={perbaikiRemisiAction}
-                          hidden={{ id: p.id }}
-                          submitLabel="Kirim perbaikan"
-                          fields={[
-                            { name: "alasan", label: "Alasan pengajuan", type: "textarea", required: true, defaultValue: p.alasan, span: 2 },
-                            { name: "file", label: "Surat pendukung baru (opsional)", type: "file", hint: "Kosongkan untuk tetap memakai surat sebelumnya.", span: 2 },
-                          ]}
-                        />
-                      </Disclosure>
-                    </div>
-                  )}
-                </Card>
-              ))}
+              {lainnya.map((p) => {
+                const milikSaya = pengaju && p.diajukan_oleh === profile.id;
+                return (
+                  <Card key={p.id} className="p-4">
+                    <KartuPengajuan p={p} />
+
+                    {milikSaya && p.status === "perlu_perbaikan" && (
+                      <div className="mt-3">
+                        <Disclosure summary="Perbaiki pengajuan" defaultOpen>
+                          <ActionForm
+                            action={perbaikiRemisiAction}
+                            hidden={{ id: p.id }}
+                            submitLabel="Kirim perbaikan"
+                            fields={[
+                              { name: "alasan", label: "Alasan pengajuan", type: "textarea", required: true, defaultValue: p.alasan, span: 2 },
+                              { name: "file", label: "Surat pendukung baru (opsional)", type: "file", hint: "Kosongkan untuk tetap memakai surat sebelumnya.", span: 2 },
+                            ]}
+                          />
+                        </Disclosure>
+                      </div>
+                    )}
+
+                    {milikSaya && p.status === "diajukan" && (
+                      <div className="mt-3">
+                        <Disclosure summary="Ubah pengajuan">
+                          <ActionForm
+                            action={ubahRemisiAction}
+                            hidden={{ id: p.id }}
+                            submitLabel="Simpan perubahan"
+                            fields={[
+                              { name: "alasan", label: "Alasan pengajuan", type: "textarea", required: true, defaultValue: p.alasan, span: 2 },
+                              { name: "file", label: "Surat pendukung baru (opsional)", type: "file", hint: "Kosongkan untuk tetap memakai surat sebelumnya.", span: 2 },
+                            ]}
+                          />
+                        </Disclosure>
+                      </div>
+                    )}
+
+                    {milikSaya && (p.status === "diajukan" || p.status === "perlu_perbaikan") && (
+                      <div className="mt-3">
+                        <Disclosure summary="Tarik pengajuan">
+                          <ActionForm
+                            action={tarikRemisiAction}
+                            hidden={{ id: p.id }}
+                            submitLabel="Tarik pengajuan"
+                            fields={[
+                              { name: "konfirmasi", label: "Konfirmasi", type: "select", required: true, options: [{ value: "ya", label: "Ya, tarik pengajuan ini" }], span: 2 },
+                            ]}
+                          />
+                        </Disclosure>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
             </div>
           )}
         </section>
