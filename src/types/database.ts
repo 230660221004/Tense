@@ -597,6 +597,67 @@ export type Database = {
           },
         ];
       };
+      remisi_pengajuan: {
+        Row: {
+          alasan: string;
+          catatan_kepsek: string | null;
+          catatan_tanse: string | null;
+          created_at: string;
+          diajukan_oleh: string;
+          diputuskan_at: string | null;
+          diputuskan_oleh: string | null;
+          diverifikasi_at: string | null;
+          diverifikasi_oleh: string | null;
+          dokumen_id: string;
+          id: string;
+          poin_disahkan: number | null;
+          poin_rekomendasi: number | null;
+          remisi_id: string | null;
+          siswa_id: string;
+          status: Database["public"]["Enums"]["status_remisi_pengajuan"];
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "remisi_pengajuan_pengaju_fkey";
+            columns: ["diajukan_oleh"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "remisi_pengajuan_siswa_fkey";
+            columns: ["siswa_id"];
+            isOneToOne: false;
+            referencedRelation: "siswa";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "remisi_pengajuan_dokumen_fkey";
+            columns: ["dokumen_id"];
+            isOneToOne: false;
+            referencedRelation: "dokumen";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "remisi_pengajuan_verif_fkey";
+            columns: ["diverifikasi_oleh"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "remisi_pengajuan_putus_fkey";
+            columns: ["diputuskan_oleh"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       siswa: {
         Row: {
           alamat: string | null;
@@ -1042,6 +1103,22 @@ export type Database = {
         Args: { p_siswa: string };
         Returns: { alamat: string | null; no_hp_orang_tua: string | null }[];
       };
+      ajukan_remisi: {
+        Args: { p_alasan: string; p_dokumen: string; p_siswa: string };
+        Returns: string;
+      };
+      perbaiki_remisi: {
+        Args: { p_alasan: string; p_dokumen?: string; p_id: string };
+        Returns: undefined;
+      };
+      putuskan_remisi: {
+        Args: { p_catatan: string; p_id: string; p_poin: number; p_setuju: boolean };
+        Returns: undefined;
+      };
+      verifikasi_remisi: {
+        Args: { p_aksi: string; p_catatan: string; p_id: string; p_poin: number };
+        Returns: undefined;
+      };
       rekap_poin_siswa: {
         Args: { p_siswa_id?: string; p_tahun_ajaran_id: string };
         Returns: {
@@ -1163,6 +1240,13 @@ export type Database = {
         | "skorsing"
         | "pernyataan_siswa"
         | "berita_acara";
+      status_remisi_pengajuan:
+        | "diajukan"
+        | "perlu_perbaikan"
+        | "direkomendasikan"
+        | "disetujui"
+        | "ditolak_tanse"
+        | "ditolak_kepsek";
       status_pelanggaran:
         | "menunggu_persetujuan"
         | "disetujui"
@@ -1326,6 +1410,14 @@ export const Constants = {
         "skorsing",
         "pernyataan_siswa",
         "berita_acara",
+      ],
+      status_remisi_pengajuan: [
+        "diajukan",
+        "perlu_perbaikan",
+        "direkomendasikan",
+        "disetujui",
+        "ditolak_tanse",
+        "ditolak_kepsek",
       ],
       status_pelanggaran: [
         "menunggu_persetujuan",

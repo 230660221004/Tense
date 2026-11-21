@@ -95,12 +95,30 @@ export const tindakLanjutSchema = z.object({
 
 export const statusTLSchema = z.object({ id: z.uuid(), status: z.enum(STATUS_TINDAK_LANJUT) });
 
-export const remisiSchema = z.object({
+export const ajukanRemisiSchema = z.object({
   siswa_id: z.uuid("Pilih siswa"),
-  jumlah_poin: z.coerce.number().int().min(1, "Minimal 1 poin").max(500),
-  keterangan: reqText("Alasan", 1000),
-  tanggal: tanggal,
-  surat_dokumen_id: optUuid,
+  alasan: reqText("Alasan", 1000),
+});
+export const perbaikiRemisiSchema = z.object({
+  id: z.uuid(),
+  alasan: reqText("Alasan", 1000),
+});
+export const verifikasiRemisiSchema = z.object({
+  id: z.uuid(),
+  aksi: z.enum(["rekomendasi", "perbaikan", "tolak"], { error: "Pilih keputusan verifikasi" }),
+  poin: z.union([z.coerce.number().int().min(1, "Minimal 1 poin").max(500), z.literal("")]).optional().transform((v) => (v === "" || v === undefined ? null : v)),
+  catatan: optText(1000),
+}).superRefine((d, ctx) => {
+  if (d.aksi === "rekomendasi" && d.poin === null) ctx.addIssue({ code: "custom", path: ["poin"], message: "Poin rekomendasi wajib diisi" });
+  if (d.aksi !== "rekomendasi" && !d.catatan) ctx.addIssue({ code: "custom", path: ["catatan"], message: "Catatan wajib diisi" });
+});
+export const putuskanRemisiSchema = z.object({
+  id: z.uuid(),
+  keputusan: z.enum(["setuju", "tolak"], { error: "Pilih keputusan" }),
+  poin: z.union([z.coerce.number().int().min(1, "Minimal 1 poin").max(500), z.literal("")]).optional().transform((v) => (v === "" || v === undefined ? null : v)),
+  catatan: optText(1000),
+}).superRefine((d, ctx) => {
+  if (d.keputusan === "tolak" && !d.catatan) ctx.addIssue({ code: "custom", path: ["catatan"], message: "Catatan wajib diisi untuk penolakan" });
 });
 
 export const suratDraftSchema = z.object({

@@ -31,7 +31,7 @@ function aksiCepat(role: UserRole): { href: string; label: string; icon: LucideI
     { href: "/persetujuan", label: "Putuskan usulan", icon: BadgeCheck, roles: PENGELOLA },
     { href: "/tindak-lanjut", label: "Tindak lanjut", icon: ClipboardList, roles: PENGELOLA },
     { href: "/surat", label: "Buat surat", icon: Mail, roles: PENGELOLA },
-    { href: "/remisi", label: "Remisi", icon: HeartHandshake, roles: PENGELOLA },
+    { href: "/remisi", label: "Remisi", icon: HeartHandshake, roles: ["bk", "kepala_sekolah"] as UserRole[] },
     { href: "/arsip", label: "Cari arsip", icon: Search, roles: ["guru", "kepala_sekolah"] as UserRole[] },
     { href: "/siswa", label: "Data siswa", icon: GraduationCap, roles: ["guru", "kepala_sekolah"] as UserRole[] },
   ];

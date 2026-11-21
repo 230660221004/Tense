@@ -24,7 +24,7 @@ Skorsing: pada 75 poin, sistem menandai siswa sebagai mencapai ambang skorsing. 
 
 Surat dan berita acara: terisi otomatis dari data siswa dan pelanggaran, lalu bisa diunduh.
 
-Remisi sederhana: surat diunggah, lalu Tanse menginput pengurangan poin. Pengurangan itu tercatat di riwayat.
+Remisi berjenjang: siswa/orang tua mengajukan dengan surat pendukung, Tanse memverifikasi (rekomendasi, minta perbaikan, atau tolak), lalu kepala sekolah memutuskan. Poin berkurang hanya setelah disetujui dan tercatat di riwayat.
 
 Hak akses per peran
 
@@ -32,7 +32,7 @@ Guru: mengusulkan pelanggaran.
 
 Wali kelas: mengusulkan dan hanya melihat kelasnya sendiri.
 
-Tanse: menyetujui, merevisi, menolak, menginput langsung, dan mengelola remisi.
+Tanse: menyetujui, merevisi, menolak, menginput langsung, dan memverifikasi pengajuan remisi (keputusan akhir remisi di kepala sekolah).
 
 Orang tua: melihat total poin dan sumbernya (pelanggaran apa).
 

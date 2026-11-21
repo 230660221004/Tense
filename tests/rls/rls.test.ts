@@ -212,15 +212,63 @@ describe.skipIf(!enabled)("RLS & alur persetujuan (Supabase lokal)", () => {
     expect((await ortu.from("pelanggaran").select("id").eq("siswa_id", siswaLain.id)).data).toEqual([]);
   });
 
-  it("remisi divalidasi: dokumen siswa sama & tidak melebihi poin bersih", async () => {
+  it("remisi tidak bisa ditulis langsung; hanya lewat alur ajukan → verifikasi → putuskan", async () => {
     const { data: dokLain } = await service.from("dokumen").select("id, siswa_id").limit(1).single();
-    const target = (await bk.rpc("rekap_poin_siswa", { p_tahun_ajaran_id: taId })).data!.find((r) => r.siswa_id !== dokLain!.siswa_id && r.poin_bersih > 0)!;
-    const salahDok = await bk.from("remisi").insert({ siswa_id: target.siswa_id, jumlah_poin: 1, keterangan: "x", tanggal: "2026-11-10", surat_dokumen_id: dokLain!.id, dicatat_oleh: ids.bk! });
-    expect(salahDok.error?.message).toMatch(/milik siswa yang sama/);
-    const rek = (await bk.rpc("rekap_poin_siswa", { p_tahun_ajaran_id: taId, p_siswa_id: dokLain!.siswa_id })).data![0]!;
-    const lebih = await bk.from("remisi").insert({ siswa_id: dokLain!.siswa_id, jumlah_poin: rek.poin_bersih + 1, keterangan: "x", tanggal: "2026-11-10", surat_dokumen_id: dokLain!.id, dicatat_oleh: ids.bk! });
-    expect(lebih.error?.message).toMatch(/melebihi poin bersih/);
-    expect((await guru1.from("remisi").insert({ siswa_id: dokLain!.siswa_id, jumlah_poin: 1, keterangan: "x", surat_dokumen_id: dokLain!.id, dicatat_oleh: ids.guru1! })).error).not.toBeNull();
+    for (const [nama, c, uid] of [["bk", bk, ids.bk!], ["kepsek", kepsek, ids.kepsek!], ["guru1", guru1, ids.guru1!]] as const) {
+      const r = await c.from("remisi").insert({ siswa_id: dokLain!.siswa_id, jumlah_poin: 1, keterangan: "x", surat_dokumen_id: dokLain!.id, dicatat_oleh: uid });
+      expect(r.error, `insert langsung oleh ${nama}`).not.toBeNull();
+    }
+    expect((await bk.from("remisi_pengajuan").update({ status: "disetujui" }).neq("status", "disetujui").select()).data ?? []).toEqual([]);
+  });
+
+  it("alur pengajuan remisi: siswa → Tanse → kepala sekolah", async () => {
+    const { data: me } = await service.from("siswa").select("id").eq("profile_id", ids.siswa!).single();
+    // bersihkan pengajuan aktif dari run sebelumnya
+    await service.from("remisi_pengajuan").delete().eq("siswa_id", me!.id).in("status", ["diajukan", "perlu_perbaikan", "direkomendasikan"]);
+    const rek = (await bk.rpc("rekap_poin_siswa", { p_tahun_ajaran_id: taId, p_siswa_id: me!.id })).data![0]!;
+    if (rek.poin_bersih < 1) return; // tidak ada poin untuk diremisi pada data demo
+
+    const dok = async (siswaId: string, jenis: "surat_remisi" | "surat_pernyataan") => {
+      const { data } = await service.from("dokumen").insert({ siswa_id: siswaId, jenis, judul: "uji", nama_file: "uji.pdf", storage_path: `siswa/${siswaId}/uji-${crypto.randomUUID()}.pdf`, diunggah_oleh: ids.siswa! }).select("id").single();
+      return data!.id;
+    };
+    const dokOk = await dok(me!.id, "surat_remisi");
+    const dokSalah = await dok(me!.id, "surat_pernyataan");
+
+    expect((await ortu.rpc("ajukan_remisi", { p_siswa: siswaLain.id, p_alasan: "x", p_dokumen: dokOk })).error).not.toBeNull(); // bukan anaknya
+    expect((await bk.rpc("ajukan_remisi", { p_siswa: me!.id, p_alasan: "x", p_dokumen: dokOk })).error).not.toBeNull(); // bukan pengaju
+    expect((await siswa.rpc("ajukan_remisi", { p_siswa: me!.id, p_alasan: "x", p_dokumen: dokSalah })).error?.message).toMatch(/surat remisi/);
+
+    const aju = await siswa.rpc("ajukan_remisi", { p_siswa: me!.id, p_alasan: "Berkelakuan baik", p_dokumen: dokOk });
+    expect(aju.error).toBeNull();
+    const id = aju.data!;
+    expect((await siswa.rpc("ajukan_remisi", { p_siswa: me!.id, p_alasan: "lagi", p_dokumen: dokOk })).error?.message).toMatch(/sedang diproses/);
+
+    // kepala sekolah belum bisa memutuskan sebelum direkomendasikan; siswa tidak bisa memverifikasi
+    expect((await kepsek.rpc("putuskan_remisi", { p_id: id, p_setuju: true, p_poin: 1, p_catatan: "" })).error).not.toBeNull();
+    expect((await siswa.rpc("verifikasi_remisi", { p_id: id, p_aksi: "rekomendasi", p_poin: 1, p_catatan: "" })).error).not.toBeNull();
+
+    // Tanse: perbaikan wajib catatan, lalu pengaju memperbaiki
+    expect((await bk.rpc("verifikasi_remisi", { p_id: id, p_aksi: "perbaikan", p_poin: null as unknown as number, p_catatan: "" })).error).not.toBeNull();
+    expect((await bk.rpc("verifikasi_remisi", { p_id: id, p_aksi: "perbaikan", p_poin: null as unknown as number, p_catatan: "Lengkapi surat" })).error).toBeNull();
+    expect((await ortu.rpc("perbaiki_remisi", { p_id: id, p_alasan: "x" })).error).not.toBeNull();
+    expect((await siswa.rpc("perbaiki_remisi", { p_id: id, p_alasan: "Sudah dilengkapi" })).error).toBeNull();
+
+    // Rekomendasi tidak boleh melebihi poin bersih
+    expect((await bk.rpc("verifikasi_remisi", { p_id: id, p_aksi: "rekomendasi", p_poin: rek.poin_bersih + 1, p_catatan: "" })).error?.message).toMatch(/poin bersih/);
+    expect((await bk.rpc("verifikasi_remisi", { p_id: id, p_aksi: "rekomendasi", p_poin: 1, p_catatan: "Layak" })).error).toBeNull();
+
+    // Tanse tidak boleh memutuskan; kepala sekolah menyetujui → poin bersih turun
+    expect((await bk.rpc("putuskan_remisi", { p_id: id, p_setuju: true, p_poin: 1, p_catatan: "" })).error).not.toBeNull();
+    expect((await kepsek.rpc("putuskan_remisi", { p_id: id, p_setuju: true, p_poin: 1, p_catatan: "Disetujui" })).error).toBeNull();
+    const sesudah = (await bk.rpc("rekap_poin_siswa", { p_tahun_ajaran_id: taId, p_siswa_id: me!.id })).data![0]!;
+    expect(sesudah.poin_bersih).toBe(rek.poin_bersih - 1);
+    const { data: akhir } = await siswa.from("remisi_pengajuan").select("status, remisi_id, poin_disahkan").eq("id", id).single();
+    expect(akhir).toMatchObject({ status: "disetujui", poin_disahkan: 1 });
+    expect(akhir!.remisi_id).not.toBeNull();
+
+    // siswa lain tidak melihat pengajuan ini
+    expect((await guru2.from("remisi_pengajuan").select("id").eq("id", id)).data).toEqual([]);
   });
 
   it("audit log & status log append-only", async () => {

@@ -2,9 +2,12 @@ import type { UserRole } from "@/lib/domain/types";
 
 export const STAFF: UserRole[] = ["admin", "bk", "kepala_sekolah"];
 // Sesuai wawancara: guru/wali kelas mengusulkan; Tanse (bk) memutuskan, merevisi, input langsung,
-// remisi, tindak lanjut, dan surat. Admin = akun & data master saja (baca-saja untuk data kedisiplinan).
+// tindak lanjut, dan surat. Remisi: diajukan siswa/orang tua, diverifikasi Tanse, diputuskan kepala sekolah. Admin = akun & data master saja (baca-saja untuk data kedisiplinan).
 export const PENGUSUL: UserRole[] = ["guru", "bk"];
 export const PENGELOLA: UserRole[] = ["bk"];
+// Alur remisi berjenjang: siswa/orang tua mengajukan -> Tanse (bk) verifikasi -> kepala sekolah memutuskan.
+export const PENGAJU_REMISI: UserRole[] = ["siswa", "orang_tua"];
+export const PEMUTUS_REMISI: UserRole[] = ["kepala_sekolah"];
 
 /** Akses route (dicek ulang di server tiap halaman; RLS tetap penegak akhir). */
 export const ROUTE_ROLES = {
@@ -18,7 +21,7 @@ export const ROUTE_ROLES = {
   tindakLanjut: STAFF,
   dokumen: STAFF,
   surat: STAFF,
-  remisi: STAFF,
+  remisi: ["admin", "bk", "kepala_sekolah", "siswa", "orang_tua"],
   notifikasi: ["admin", "bk", "kepala_sekolah", "guru", "siswa", "orang_tua"],
   audit: ["admin", "kepala_sekolah"],
   master: ["admin"],

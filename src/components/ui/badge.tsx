@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils/format";
-import type { StatusPelanggaran, StatusSurat, StatusTindakLanjut } from "@/lib/domain/types";
-import { STATUS_PELANGGARAN_LABEL, STATUS_SURAT_LABEL, STATUS_TL_LABEL } from "@/lib/domain/types";
+import type { StatusPelanggaran, StatusRemisiPengajuan, StatusSurat, StatusTindakLanjut } from "@/lib/domain/types";
+import { STATUS_PELANGGARAN_LABEL, STATUS_REMISI_LABEL, STATUS_SURAT_LABEL, STATUS_TL_LABEL } from "@/lib/domain/types";
 
 type Tone = "neutral" | "success" | "warning" | "danger" | "info";
 const tones: Record<Tone, string> = {
@@ -45,4 +45,11 @@ export function StatusTLBadge({ status }: { status: StatusTindakLanjut }) {
 const suratTone: Record<StatusSurat, Tone> = { draft: "warning", final: "success", dibatalkan: "neutral" };
 export function StatusSuratBadge({ status }: { status: StatusSurat }) {
   return <Badge tone={suratTone[status]}>{STATUS_SURAT_LABEL[status]}</Badge>;
+}
+
+const remisiTone: Record<StatusRemisiPengajuan, Tone> = {
+  diajukan: "warning", perlu_perbaikan: "info", direkomendasikan: "info", disetujui: "success", ditolak_tanse: "danger", ditolak_kepsek: "danger",
+};
+export function StatusRemisiBadge({ status }: { status: StatusRemisiPengajuan }) {
+  return <Badge tone={remisiTone[status]}>{STATUS_REMISI_LABEL[status]}</Badge>;
 }

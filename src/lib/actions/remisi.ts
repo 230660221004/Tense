@@ -2,41 +2,89 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { PENGELOLA } from "@/lib/permissions";
-import { formObject, remisiSchema } from "@/lib/validations";
+import { PEMUTUS_REMISI, PENGAJU_REMISI, PENGELOLA } from "@/lib/permissions";
+import { ajukanRemisiSchema, formObject, perbaikiRemisiSchema, putuskanRemisiSchema, verifikasiRemisiSchema } from "@/lib/validations";
 import { simpanDokumen } from "./dokumen-core";
 import { type ActionState, pesanError, zodErrors } from "./types";
 
-export async function buatRemisiAction(_: ActionState, fd: FormData): Promise<ActionState> {
-  const profile = await requireRole(PENGELOLA);
-  const parsed = remisiSchema.safeParse(formObject(fd));
+// Catatan: tabel `remisi` (pengurang poin) tidak lagi ditulis dari aplikasi. Baris remisi hanya dibuat
+// oleh fungsi database putuskan_remisi() ketika kepala sekolah menyetujui pengajuan.
+
+function segarkan(siswaId?: string | null) {
+  revalidatePath("/remisi");
+  revalidatePath("/dashboard");
+  revalidatePath("/notifikasi");
+  if (siswaId) revalidatePath(`/siswa/${siswaId}`);
+}
+
+/** Siswa / orang tua mengajukan remisi beserta surat pendukung. */
+export async function ajukanRemisiAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const profile = await requireRole(PENGAJU_REMISI);
+  const parsed = ajukanRemisiSchema.safeParse(formObject(fd));
   if (!parsed.success) return { ok: false, message: "Periksa kembali isian.", errors: zodErrors(parsed.error.issues) };
   const supabase = await createClient();
+  const dok = await simpanDokumen(supabase, profile.id, fd.get("file"), { siswa_id: parsed.data.siswa_id, jenis: "surat_remisi", judul: "Surat pengajuan remisi" });
+  if (!dok.ok) return { ok: false, message: dok.message, errors: { file: dok.message } };
+  const { error } = await supabase.rpc("ajukan_remisi", { p_siswa: parsed.data.siswa_id, p_alasan: parsed.data.alasan, p_dokumen: dok.id });
+  if (error) return { ok: false, message: pesanError(error, "Pengajuan remisi gagal dikirim.") };
+  segarkan(parsed.data.siswa_id);
+  return { ok: true, message: "Pengajuan terkirim. Tanse akan memverifikasinya." };
+}
 
-  // Validasi awal poin bersih (DB tetap memvalidasi ulang di trigger).
-  const { data: ta } = await supabase.from("tahun_ajaran").select("id").lte("tanggal_mulai", parsed.data.tanggal).gte("tanggal_selesai", parsed.data.tanggal).order("aktif", { ascending: false }).limit(1).maybeSingle();
-  if (!ta) return { ok: false, message: "Tanggal remisi di luar tahun ajaran yang terdaftar.", errors: { tanggal: "Di luar tahun ajaran" } };
-  const { data: rekap } = await supabase.rpc("rekap_poin_siswa", { p_tahun_ajaran_id: ta.id, p_siswa_id: parsed.data.siswa_id });
-  const bersih = rekap?.[0]?.poin_bersih ?? 0;
-  if (parsed.data.jumlah_poin > bersih) return { ok: false, message: `Remisi melebihi poin bersih siswa (${bersih}).`, errors: { jumlah_poin: `Maksimal ${bersih}` } };
+/** Pengaju memperbaiki pengajuan yang dikembalikan Tanse (surat baru bersifat opsional). */
+export async function perbaikiRemisiAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const profile = await requireRole(PENGAJU_REMISI);
+  const parsed = perbaikiRemisiSchema.safeParse(formObject(fd));
+  if (!parsed.success) return { ok: false, message: "Periksa kembali isian.", errors: zodErrors(parsed.error.issues) };
+  const supabase = await createClient();
+  const { data: aju } = await supabase.from("remisi_pengajuan").select("siswa_id").eq("id", parsed.data.id).maybeSingle();
+  if (!aju) return { ok: false, message: "Pengajuan tidak ditemukan." };
 
-  let dokumenId = parsed.data.surat_dokumen_id;
-  if (!dokumenId) {
-    const res = await simpanDokumen(supabase, profile.id, fd.get("file"), { siswa_id: parsed.data.siswa_id, jenis: "surat_remisi", judul: "Surat pendukung remisi" });
-    if (!res.ok) return { ok: false, message: res.message, errors: { file: res.message } };
-    dokumenId = res.id;
+  let dokumenId: string | undefined;
+  const file = fd.get("file");
+  if (file instanceof File && file.size > 0) {
+    const dok = await simpanDokumen(supabase, profile.id, file, { siswa_id: aju.siswa_id, jenis: "surat_remisi", judul: "Surat pengajuan remisi (perbaikan)" });
+    if (!dok.ok) return { ok: false, message: dok.message, errors: { file: dok.message } };
+    dokumenId = dok.id;
   }
-  const { error } = await supabase.from("remisi").insert({
-    siswa_id: parsed.data.siswa_id,
-    jumlah_poin: parsed.data.jumlah_poin,
-    keterangan: parsed.data.keterangan,
-    tanggal: parsed.data.tanggal,
-    surat_dokumen_id: dokumenId,
-    dicatat_oleh: profile.id,
+  const { error } = await supabase.rpc("perbaiki_remisi", { p_id: parsed.data.id, p_alasan: parsed.data.alasan, p_dokumen: dokumenId });
+  if (error) return { ok: false, message: pesanError(error, "Perbaikan gagal dikirim.") };
+  segarkan(aju.siswa_id);
+  return { ok: true, message: "Perbaikan terkirim ke Tanse." };
+}
+
+/** Tanse: rekomendasikan ke kepala sekolah, minta perbaikan, atau tolak. */
+export async function verifikasiRemisiAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  await requireRole(PENGELOLA);
+  const parsed = verifikasiRemisiSchema.safeParse(formObject(fd));
+  if (!parsed.success) return { ok: false, message: "Periksa kembali isian.", errors: zodErrors(parsed.error.issues) };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("verifikasi_remisi", {
+    p_id: parsed.data.id,
+    p_aksi: parsed.data.aksi,
+    p_poin: parsed.data.aksi === "rekomendasi" ? (parsed.data.poin as number) : (null as unknown as number),
+    p_catatan: parsed.data.catatan ?? "",
   });
-  if (error) return { ok: false, message: pesanError(error, "Remisi gagal disimpan.") };
-  revalidatePath("/remisi");
-  revalidatePath(`/siswa/${parsed.data.siswa_id}`);
-  revalidatePath("/dashboard");
-  return { ok: true, message: "Remisi tercatat." };
+  if (error) return { ok: false, message: pesanError(error, "Verifikasi gagal disimpan.") };
+  segarkan();
+  const pesan = { rekomendasi: "Direkomendasikan ke kepala sekolah.", perbaikan: "Dikembalikan ke pengaju untuk diperbaiki.", tolak: "Pengajuan ditolak." } as const;
+  return { ok: true, message: pesan[parsed.data.aksi] };
+}
+
+/** Kepala sekolah: setujui (poin dapat disesuaikan) atau tolak. */
+export async function putuskanRemisiAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  await requireRole(PEMUTUS_REMISI);
+  const parsed = putuskanRemisiSchema.safeParse(formObject(fd));
+  if (!parsed.success) return { ok: false, message: "Periksa kembali isian.", errors: zodErrors(parsed.error.issues) };
+  const setuju = parsed.data.keputusan === "setuju";
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("putuskan_remisi", {
+    p_id: parsed.data.id,
+    p_setuju: setuju,
+    p_poin: (setuju ? parsed.data.poin : null) as unknown as number, // null → memakai poin rekomendasi Tanse
+    p_catatan: parsed.data.catatan ?? "",
+  });
+  if (error) return { ok: false, message: pesanError(error, "Keputusan gagal disimpan.") };
+  segarkan();
+  return { ok: true, message: setuju ? "Remisi disetujui; poin siswa berkurang." : "Remisi ditolak." };
 }

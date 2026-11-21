@@ -12,6 +12,7 @@ export type StatusTindakLanjut = Enums["status_tindak_lanjut"];
 export type JenisDokumen = Enums["jenis_dokumen"];
 export type JenisSurat = Enums["jenis_surat"];
 export type StatusSurat = Enums["status_surat"];
+export type StatusRemisiPengajuan = Enums["status_remisi_pengajuan"];
 
 export const USER_ROLES = ["admin", "bk", "kepala_sekolah", "guru", "siswa", "orang_tua"] as const satisfies readonly UserRole[];
 export const STATUS_PELANGGARAN = ["menunggu_persetujuan", "disetujui", "disahkan", "ditolak", "dibatalkan"] as const satisfies readonly StatusPelanggaran[];
@@ -66,3 +67,14 @@ export const JENIS_SURAT_LABEL: Record<JenisSurat, string> = {
 };
 export const STATUS_SURAT_LABEL: Record<StatusSurat, string> = { draft: "Draft", final: "Final", dibatalkan: "Dibatalkan" };
 export const JALUR_LABEL: Record<JalurPelanggaran, string> = { usulan: "Usulan guru/wali kelas", langsung: "Input langsung Tanse" };
+
+export const STATUS_REMISI_LABEL: Record<StatusRemisiPengajuan, string> = {
+  diajukan: "Menunggu verifikasi Tanse",
+  perlu_perbaikan: "Perlu perbaikan",
+  direkomendasikan: "Menunggu keputusan kepala sekolah",
+  disetujui: "Disetujui",
+  ditolak_tanse: "Ditolak Tanse",
+  ditolak_kepsek: "Ditolak kepala sekolah",
+};
+/** Status yang masih berjalan (satu pengajuan aktif per siswa). */
+export const STATUS_REMISI_AKTIF: StatusRemisiPengajuan[] = ["diajukan", "perlu_perbaikan", "direkomendasikan"];
