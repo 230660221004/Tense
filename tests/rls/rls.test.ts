@@ -218,7 +218,15 @@ describe.skipIf(!enabled)("RLS & alur persetujuan (Supabase lokal)", () => {
       const r = await c.from("remisi").insert({ siswa_id: dokLain!.siswa_id, jumlah_poin: 1, keterangan: "x", surat_dokumen_id: dokLain!.id, dicatat_oleh: uid });
       expect(r.error, `insert langsung oleh ${nama}`).not.toBeNull();
     }
-    expect((await bk.from("remisi_pengajuan").update({ status: "disetujui" }).neq("status", "disetujui").select()).data ?? []).toEqual([]);
+    expect(
+      (
+        await bk
+          .from("remisi_pengajuan")
+          .update({ status: "disetujui" } as never)
+          .neq("status", "disetujui")
+          .select()
+      ).data ?? [],
+    ).toEqual([]);
   });
 
   it("alur pengajuan remisi: siswa → Tanse → kepala sekolah", async () => {
